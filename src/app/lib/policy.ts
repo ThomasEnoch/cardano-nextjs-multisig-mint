@@ -1,3 +1,5 @@
+'use server'
+
 import {
   Ed25519KeyHash,
   NativeScript,
@@ -7,13 +9,12 @@ import {
   TimelockExpiry,
 } from "@emurgo/cardano-serialization-lib-asmjs";
 
-const POLICY_KEY_HASH = process.env.POLICY_KEY_HASH;
-const EXPIRATION_DATE = '2030-01-01';
+const { POLICY_KEY_HASH, POLICY_EXPIRATION_DATE } = process.env;
 
 /**
  * Convert a date to a Cardano slot number
  */
-export function dateToSlot(date: Date): number {
+export async function dateToSlot(date: Date): Promise<number> {
   return Math.floor(date.getTime() / 1000) - 1596491091 + 4924800;
 }
 
@@ -26,15 +27,19 @@ export function dateToSlot(date: Date): number {
  * - policyId: A unique identifier derived from the policy script that permanently
  *   identifies all tokens minted under this policy
  */
-export function createOrLoadPolicy() {
-  const slot = dateToSlot(new Date(EXPIRATION_DATE));
+export async function createOrLoadPolicy() {
+  if (!POLICY_EXPIRATION_DATE || !POLICY_KEY_HASH) {
+    throw new Error('POLICY_EXPIRATION_DATE or POLICY_KEY_HASH is not defined in environment variables');
+  }
+  
+  const slot = await dateToSlot(new Date(POLICY_EXPIRATION_DATE));
   const keyHash = POLICY_KEY_HASH;
   
   if (!keyHash) {
     throw new Error('POLICY_KEY_HASH is not defined in environment variables');
   }
   
-  const policy = createPolicyScript(keyHash, slot, true);
+  const policy = await createPolicyScript(keyHash, slot, true);
   const policyId = Buffer.from(policy.mintScript.hash().to_bytes()).toString("hex");
   return { slot, keyHash, policyId };
 }
@@ -42,11 +47,11 @@ export function createOrLoadPolicy() {
 /**
  * Create a policy script for minting tokens
  */
-export function createPolicyScript(
+export async function createPolicyScript(
   policyKeyHash: string,
   ttl: number,
   withTimelock = true,
-): { mintScript: NativeScript; policyTTL: number } {
+): Promise<{ mintScript: NativeScript; policyTTL: number }> {
   const scripts = NativeScripts.new();
   const keyHashScript = NativeScript.new_script_pubkey(
     ScriptPubkey.new(Ed25519KeyHash.from_hex(policyKeyHash)),
