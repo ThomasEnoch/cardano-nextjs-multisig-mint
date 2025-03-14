@@ -1,14 +1,21 @@
-## Anvil API Integration (Continued)
+const ANVIL_API_URL = process.env.ANVIL_API_URL;
+const ANVIL_API_KEY = process.env.ANVIL_API_KEY;
 
-Continuing with the Anvil API integration, we'll implement functions for transaction creation and submission:
+import { FixedTransaction, PrivateKey } from "@emurgo/cardano-serialization-lib-asmjs";
 
-```typescript
+// Ensure headers are set properly for all API calls
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-Api-Key': ANVIL_API_KEY || '',
+});
+
 /**
  * Create a transaction using the Anvil API
  */
 export async function createTransaction(
   changeAddress: string,
-  asset: any,
+  utxos: string | string[],
+  asset: { assetName: string, policyId: string, quantity: number },
   keyHash: string,
   slot: number,
   policyId: string,
@@ -22,11 +29,12 @@ export async function createTransaction(
     mint: [asset],
     outputs: [
       {
-        address: process.env.TREASURY_ADDRESS,
+        address: process.env.TREASURY_BASE_ADDRESS_PREPROD,
         lovelace: 1_000_000,
       },
       {
         address: changeAddress,
+        utxos: utxos,
         assets: [
           {
             assetName: asset.assetName,
@@ -79,16 +87,34 @@ export async function createTransaction(
 /**
  * Submit a signed transaction to the blockchain
  */
-export async function submitTransaction(signedCborHex: string) {
+export async function submitTransaction(signedTx: string, completeTransaction: string) {
   if (!ANVIL_API_URL || !ANVIL_API_KEY) {
     throw new Error('Anvil API URL or key not found in environment variables');
   }
-
+  
   try {
+    // Sign transaction with policy key
+    const transactionToSubmit = FixedTransaction.from_bytes(
+      Buffer.from(completeTransaction, "hex"),
+    );
+
+    // Add policy key signature - you need to load this from environment variables or a secure store
+    const policyKey = process.env.POLICY_SIGN_KEY;
+    if (!policyKey) {
+      throw new Error('Policy private key not found');
+    }
+
+    transactionToSubmit.sign_and_add_vkey_signature(
+      PrivateKey.from_bech32(policyKey),
+    );
+
     const response = await fetch(`${ANVIL_API_URL}/transactions/submit`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ transaction: signedCborHex }),
+      body: JSON.stringify({ 
+        signatures: [signedTx], // Client wallet signature
+        transaction: transactionToSubmit.to_hex() // Policy-key signed transaction
+      }),
     });
 
     if (!response.ok) {
@@ -97,62 +123,9 @@ export async function submitTransaction(signedCborHex: string) {
     }
 
     return await response.json();
+
   } catch (error) {
     console.error('Error submitting transaction:', error);
     throw error;
   }
 }
-
-/**
- * Get the status of a transaction
- */
-export async function getTransactionStatus(txId: string) {
-  if (!ANVIL_API_URL || !ANVIL_API_KEY) {
-    throw new Error('Anvil API URL or key not found in environment variables');
-  }
-
-  try {
-    const response = await fetch(`${ANVIL_API_URL}/transactions/${txId}`, {
-      method: 'GET',
-      headers: getHeaders(),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error getting transaction status:', error);
-    throw error;
-  }
-}
-```
-
-## Policy Configurations
-
-Create a policy configuration file for managing the NFT policy:
-
-```typescript
-// src/lib/policy.ts
-import { dateToSlot } from './anvil';
-
-// This would typically be loaded from a secure configuration
-const POLICY_KEY_HASH = 'your_policy_key_hash';
-const EXPIRATION_DATE = '2030-01-01';
-
-/**
- * Create or load policy configuration 
- */
-export function createOrLoadPolicy() {
-  const slot = dateToSlot(new Date(EXPIRATION_DATE));
-  const keyHash = POLICY_KEY_HASH;
-  
-  // In a production environment, you would use cardano-serialization-lib
-  // to generate the actual policy script and policy ID
-  const policyId = 'sample_policy_id_for_demo_purposes';
-  
-  return { slot, keyHash, policyId };
-}
-```
