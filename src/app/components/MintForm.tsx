@@ -78,50 +78,25 @@ export default function MintForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ changeAddress: wallet.changeAddressBech32, utxos: await wallet.handler.getUtxos() }),
+        body: JSON.stringify({ changeAddress: wallet.changeAddressBech32 }),
       });
       
       const mintData = await mintResponse.json();
       
       if (!mintResponse.ok) {
-        throw new Error(mintData.error || 'Failed to create mint transaction');
-      }
-      
-      // Step 2: Sign the transaction using wallet hook
-      const signedTransaction = await wallet.handler.signTx(mintData.strippedTransaction, true);
-      if (!signedTransaction) {
-        throw new Error('Failed to sign transaction');
-      }
-
-      // Step 3: Submit the signed transaction
-      const submitResponse = await fetch('/api/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          signedTx: signedTransaction,
-          hash: mintData.hash,
-          strippedTransaction: mintData.strippedTransaction,
-        }),
-      });
-      
-      const submitData = await submitResponse.json();
-      
-      if (!submitResponse.ok) {
-        throw new Error(submitData.error || 'Failed to submit transaction');
+        throw new Error(mintData.error || 'Failed to mint NFT');
       }
       
       dispatch({
         type: 'MINT_SUCCESS', 
-        payload: submitData.result.txHash || 'Transaction submitted' 
+        payload: mintData.result.txHash || 'Transaction submitted' 
       });
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       dispatch({ type: 'MINT_ERROR', payload: errorMessage });
     }
-  }, [wallet.isConnected, wallet.changeAddressBech32, wallet.handler]);
+  }, [wallet.isConnected, wallet.changeAddressBech32]);
   
   return (
     <div className="p-6 bg-white shadow-md rounded-lg" aria-live="polite">

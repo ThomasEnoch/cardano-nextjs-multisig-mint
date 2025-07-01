@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createTransaction } from '../../lib/anvil';
-import { createOrLoadPolicy } from '../../lib/policy';
+import { createTransaction, submitTransaction } from '@/app/lib/anvil';
+import { createOrLoadPolicy } from '@/app/lib/policy';
+import { getUtxos } from '@/app/lib/blockfrost';
 
 /**
  * Mint API endpoint - creates a new NFT minting transaction
@@ -10,11 +11,23 @@ import { createOrLoadPolicy } from '../../lib/policy';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { changeAddress, utxos } = await req.json();
-    if (!changeAddress || !utxos) {
+    const { changeAddress } = await req.json();
+    if (!changeAddress) {
       return NextResponse.json(
-        { error: 'Missing change address or utxos' },
+        { error: 'Missing change address' },
         { status: 400 }
+      );
+    }
+
+    if (!process.env.TREASURY_ADDRESS) {
+      throw new Error('Treasury address not found in environment variables');
+    }
+
+    const utxos = await getUtxos(process.env.TREASURY_ADDRESS);
+    if (!utxos || utxos.length === 0) {
+      return NextResponse.json(
+        { error: 'No UTXOs found in treasury wallet. Please fund the treasury wallet.' },
+        { status: 500 }
       );
     }
 
@@ -34,10 +47,12 @@ export async function POST(req: NextRequest) {
       policyId,
     );
 
+    // Step 2: Submit the transaction
+    const result = await submitTransaction(transaction);
+
     return NextResponse.json({
       success: true,
-      hash: transaction.hash,
-      strippedTransaction: transaction.stripped // Note: if you return the complete transaction you will expose the NFT metadata when the client signs
+      result,
     });
     
   } catch (error) {

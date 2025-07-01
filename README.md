@@ -1,21 +1,21 @@
 # Cardano NFT Minting Platform
 
-A Next.js application that demonstrates how to create CIP-25 NFTs on the Cardano blockchain using the Anvil API, Redis for caching, and wallet connectivity. This platform provides a simple, user-friendly interface for minting NFTs on Cardano.
+A Next.js application that demonstrates how to create CIP-25 NFTs on the Cardano blockchain using the Anvil API and wallet connectivity. This platform features a treasury-funded minting process, where all transaction fees are paid by a backend treasury wallet, providing a seamless, fee free experience for the user.
 
 ## Features
 
-- **CIP-25 NFT Minting**: Create standard-compliant NFTs on Cardano
-- **Wallet Integration**: Connect with Cardano wallets using @ada-anvil/weld
-- **Redis Caching**: Manages caching transactions during the minting process
-- **API Routes**: Secure backend implementation using Next.js API routes
+- **Treasury-Funded Minting**: All transaction fees are paid by a backend treasury wallet, offering a fee-free user experience.
+- **Single-Click Minting**: Streamlined backend process handles transaction creation, signing, and submission in a single API call.
+- **CIP-25 NFT Minting**: Create standard-compliant NFTs on Cardano.
+- **Wallet Integration**: Connect with Cardano wallets using @ada-anvil/weld.
 
 ## Prerequisites
 
 - Node.js (version 18 or later)
 - npm or yarn package manager
-- Redis server (any datastore will work. Redis is only for this example)
-- Cardano wallet (Eternl) Currently Eternl is the only wallet supported, but you can grab the entire list of wallets using CIP-30 functions.
+- Any CIP-30 compatible browser wallet (Eternl, Lace, Begin, etc.)
 - Anvil API access key
+- Blockfrost API project ID
 
 ## Getting Started
 
@@ -29,9 +29,11 @@ ANVIL_API_URL=https://preprod.api.ada-anvil.app/v2/services
 ANVIL_API_KEY=your_anvil_api_key
 POLICY_KEY_HASH=your_policy_key_hash
 POLICY_SIGN_KEY=your_policy_private_key
-REDIS_URL=your_redis_connection_string
-TREASURY_BASE_ADDRESS_PREPROD=your_treasury_base_address
+TREASURY_ADDRESS=your_treasury_address
+TREASURY_SIGN_KEY=your_treasury_private_key
 POLICY_EXPIRATION_DATE=your_policy_expiration_date (YYYY-MM-DD format)
+BLOCKFROST_PROJECT_ID=your_blockfrost_project_id
+BLOCKFROST_BASE_URL=https://cardano-preprod.blockfrost.io/api/v0
 ```
 
 ### Installation
@@ -50,53 +52,27 @@ npm run dev
 yarn dev
 ```
 
-### Starting Redis
-
-You can start Redis using one of the following methods:
-
-```bash
-# Using Docker
-docker run -it --rm --name redis -p 6379:6379 redis
-
-# Using Podman
-podman run -d --name redis -p 6379:6379 redis
-
-# Using the Redis service (Linux)
-sudo service redis-server start
-```
-
-**Note**: Redis is used to temporarily store transaction data during the two-step minting process:
-
-1. First, the system generates the NFT and sends a partial transaction for customer signature
-2. Then, it retrieves the stored transaction, appends both customer and policy signatures, and submits it to the blockchain
-
-While Redis is used in this implementation, you can replace it with another ephemeral storage solution that supports this workflow.
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
-
 ## How It Works
 
 ### Architecture
 
-This application uses a combination of frontend and backend technologies:
+This application uses a combination of frontend and backend technologies to enable a secure and smooth NFT minting experience:
 
-1. **Frontend**: React components with Next.js for routing and rendering
-2. **Backend**: Next.js API routes for secure server-side operations
-3. **Database**: Redis for data caching and storage
-4. **Blockchain Interaction**: Anvil API for Minting and Submitting Cardano transactions
+1.  **Frontend**: A simple React interface built with Next.js. Users connect their wallet to specify a receiving address for the NFT, but no client-side transaction signing is required.
+2.  **Backend**: Next.js API routes manage the entire transaction lifecycle. The backend fetches UTXOs from the treasury wallet, builds the minting transaction, signs it with both the policy and treasury keys, and submits it to the blockchain via the Anvil API.
+3.  **Treasury Wallet**: A dedicated backend wallet pays for all transaction fees, abstracting away the complexity of fee fees from the end-user.
 
 ### Key Components
 
-- **WalletConnector**: Manages wallet connections using @ada-anvil/weld
-- **MintForm**: Handles the NFT minting process
-- **API Routes**: Process minting requests and transaction submissions
-- **Redis Client**: Manages caching and data persistence
-- **Anvil Integration**: Facilitates interaction with the Cardano blockchain
+- **WalletConnector**: Manages wallet connections using @ada-anvil/weld.
+- **MintForm**: Handles the user-facing minting flow, initiating a single API call.
+- **`/api/mint` Route**: The core backend logic that orchestrates the entire minting process.
+- **Anvil Integration**: Facilitates interaction with the Cardano blockchain for transaction building and submission.
+- **Blockfrost Integration**: Fetches UTXOs from the treasury wallet.
 
 ## API Endpoints
 
-- **POST /api/mint**: Creates a new NFT minting transaction
-- **POST /api/submit**: Signs and submits the transaction to the blockchain
+- **POST /api/mint**: A single endpoint that handles the entire minting process. It creates the transaction, signs it with the necessary policy and treasury keys, and submits it to the Cardano blockchain.
 
 ## Security Considerations
 
@@ -114,9 +90,5 @@ Feel free to fork this repository and submit PRs for any improvements. Please fo
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Cardano CIP-25 Standard](https://cips.cardano.org/cips/cip25/)
-- [Anvil API Documentation](ADD_URL)
-- [Redis Documentation](https://redis.io/documentation)
-
-## License
-
-MIT
+- [Anvil API Documentation](https://docs.ada-anvil.app/)
+- [Blockfrost API Documentation](https://docs.blockfrost.io/)

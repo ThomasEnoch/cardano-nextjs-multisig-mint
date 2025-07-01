@@ -2,7 +2,7 @@
 
 import { FixedTransaction, PrivateKey } from "@emurgo/cardano-serialization-lib-asmjs-gc";
 import { randomBytes } from 'node:crypto';
-import { getTransaction, removeTransaction, storeTransaction } from "./redis";
+
 const { ANVIL_API_URL, ANVIL_API_KEY } = process.env;
 
 // Define interfaces for the asset types
@@ -89,16 +89,12 @@ export async function createTransaction(
 
   const asset = await generateAsset(policyId);
   const data = {
-    changeAddress,
+    changeAddress: process.env.TREASURY_ADDRESS,
+    utxos,
     mint: [asset],
     outputs: [
       {
-        address: process.env.TREASURY_BASE_ADDRESS,
-        lovelace: 1_000_000,
-      },
-      {
         address: changeAddress,
-        utxos: utxos,
         assets: [
           {
             assetName: asset.assetName,
@@ -142,8 +138,6 @@ export async function createTransaction(
     }
 
     const transaction = await response.json();
-    await storeTransaction(transaction.hash, transaction);
-
     return transaction;
   } catch (error) {
     console.error('Error creating transaction:', error);
@@ -154,15 +148,9 @@ export async function createTransaction(
 /**
  * Submit a signed transaction to the blockchain
  */
-export async function submitTransaction(signedTx: string, hash: string) {
+export async function submitTransaction(transaction: { complete: string }) {
   if (!ANVIL_API_URL || !ANVIL_API_KEY) {
     throw new Error('Anvil API URL or key not found in environment variables');
-  }
-
-  // Check if transaction exists in cache
-  const transaction = await getTransaction(hash);
-  if (!transaction) {
-    throw new Error('Transaction not found or expired when submitting');
   }
   
   try {
@@ -171,7 +159,7 @@ export async function submitTransaction(signedTx: string, hash: string) {
       Buffer.from(transaction.complete, "hex"),
     );
 
-    // Add policy key signature - you need to load this from environment variables or a secure store
+    // Add policy key signature  - you need to load this from environment variables or a secure store
     const policyKey = process.env.POLICY_SIGN_KEY;
     if (!policyKey) {
       throw new Error('Policy private key not found');
@@ -181,12 +169,21 @@ export async function submitTransaction(signedTx: string, hash: string) {
       PrivateKey.from_bech32(policyKey),
     );
 
+    // Add treasury key signature - you need to load this from environment variables or a secure store
+    const treasuryKey = process.env.TREASURY_SIGN_KEY;
+    if (!treasuryKey) {
+      throw new Error('Treasury private key not found');
+    }
+
+    transactionToSubmit.sign_and_add_vkey_signature(
+      PrivateKey.from_bech32(treasuryKey),
+    );
+
     const response = await fetch(`${ANVIL_API_URL}/transactions/submit`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ 
-        signatures: [signedTx], // Client wallet signature
-        transaction: transactionToSubmit.to_hex() // Policy-key signed transaction
+        transaction: transactionToSubmit.to_hex() // Fully signed transaction
       }),
     });
 
@@ -194,9 +191,6 @@ export async function submitTransaction(signedTx: string, hash: string) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
-
-    // Remove transaction from cache after successful submission
-    await removeTransaction(hash);
 
     return await response.json();
   } catch (error) {
