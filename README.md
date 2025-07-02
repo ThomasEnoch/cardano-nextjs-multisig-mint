@@ -13,6 +13,7 @@ A Next.js application that demonstrates how to create CIP-25 NFTs on the Cardano
 
 - Node.js (version 18 or later)
 - npm or yarn package manager
+- Policy and Treasury Addresses with Private Keys for signing. (See )
 - Any CIP-30 compatible browser wallet (Eternl, Lace, Begin, etc.)
 - Anvil API access key
 - Blockfrost API project ID
