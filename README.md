@@ -1,4 +1,4 @@
-# Cardano NFT Minting Platform
+# NFT Minting Platform - Treasury pays for Fees
 
 A Next.js application that demonstrates how to create CIP-25 NFTs on the Cardano blockchain using the Anvil API and wallet connectivity. This platform features a treasury-funded minting process, where all transaction fees are paid by a backend treasury wallet, providing a seamless, fee free experience for the user.
 
