@@ -36,6 +36,16 @@ BLOCKFROST_PROJECT_ID=your_blockfrost_project_id
 BLOCKFROST_BASE_URL=https://cardano-preprod.blockfrost.io/api/v0
 ```
 
+### Getting a Blockfrost Project ID
+
+Blockfrost is used to query the blockchain for the treasury wallet's UTXOs. You can get a free Project ID by following these steps:
+
+1.  Go to [blockfrost.io](https://blockfrost.io) and create an account.
+2.  Log in and navigate to your dashboard.
+3.  Click "Add new project".
+4.  Give your project a name and, most importantly, select the **"Preprod"** network from the dropdown menu to match the project's configuration.
+5.  Your new project will appear in your dashboard. Copy the `Project ID` and paste it into your `.env.local` file as the `BLOCKFROST_PROJECT_ID`.
+
 ### Installation
 
 ```bash
